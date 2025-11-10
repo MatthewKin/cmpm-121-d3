@@ -59,33 +59,21 @@ const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
 interactionCircle.addTo(map);
 
 // -----------------------
-// Step 9 & 10: Draw cell with token value & store data
+// Step 9: Draw cell with token value
 // -----------------------
-const cellsData: Record<string, { i: number; j: number; tokenValue: number }> =
-  {};
 
-// Load cell data from localStorage if it exists
-const saved = localStorage.getItem("cellsData");
-if (saved) {
-  const parsed = JSON.parse(saved);
-  for (const key in parsed) {
-    cellsData[key] = parsed[key];
-  }
-}
+// Store all cells for interaction purposes
+const cells: {
+  i: number;
+  j: number;
+  tokenValue: number;
+  rect: leaflet.Rectangle;
+}[] = [];
 
 function drawCell(i: number, j: number) {
-  const key = `${i},${j}`;
+  const tokenValue = Math.floor(luck([i, j, "initialValue"].toString()) * 4) *
+    2;
 
-  // If we already have token data, use it; otherwise generate new
-  let tokenValue: number;
-  if (cellsData[key]) {
-    tokenValue = cellsData[key].tokenValue;
-  } else {
-    tokenValue = Math.pow(2, Math.floor(luck([i, j, "token"].toString()) * 4));
-    cellsData[key] = { i, j, tokenValue };
-  }
-
-  // Convert cell coordinates to lat/lng bounds relative to player
   const bounds = leaflet.latLngBounds([
     [
       PLAYER_LATLNG.lat + i * TILE_DEGREES,
@@ -97,37 +85,32 @@ function drawCell(i: number, j: number) {
     ],
   ]);
 
-  // Draw rectangle representing the cell
   const rect = leaflet.rectangle(bounds, {
     color: "gray",
     weight: 1,
     fillOpacity: 0.2,
   }).addTo(map);
 
-  // Display token value at the center of the cell
   const center = bounds.getCenter();
   const tokenLabel = leaflet.tooltip({
     permanent: true,
     direction: "center",
     className: "token-label",
-  })
-    .setContent(tokenValue.toString())
+  }).setContent(tokenValue.toString())
     .setLatLng(center);
 
   rect.bindTooltip(tokenLabel);
 
-  return { i, j, tokenValue };
-}
+  // Save cell for interaction purposes
+  cells.push({ i, j, tokenValue, rect });
 
-// Save cell data to localStorage
-function saveCellsData() {
-  localStorage.setItem("cellsData", JSON.stringify(cellsData));
+  return { i, j, tokenValue, rect };
 }
 
 // -----------------------
 // Draw grid around player
 // -----------------------
-const GRID_RADIUS = 4; // how many cells to draw in each direction from player
+const GRID_RADIUS = 4;
 
 for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
   for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
@@ -163,14 +146,103 @@ function drawVisibleGrid() {
   }
 }
 
-// Initially draw the visible grid
 drawVisibleGrid();
-
-// Redraw whenever the map is moved
 map.on("moveend", drawVisibleGrid);
 
-// Save cell data on page unload
-globalThis.addEventListener("beforeunload", saveCellsData);
+// -----------------------
+// Step 10: Interaction & Inventory
+// -----------------------
+
+// Track currently held token
+let heldToken: { value: number } | null = null;
+
+// Check if a cell is within interaction radius
+function isNearbyCell(i: number, j: number) {
+  return Math.abs(i) <= INTERACTION_RADIUS_CELLS &&
+    Math.abs(j) <= INTERACTION_RADIUS_CELLS;
+}
+
+// Add click handling for all drawn cells
+const drawnCellsData: {
+  i: number;
+  j: number;
+  tokenValue: number;
+  rect: leaflet.Rectangle;
+}[] = [];
+
+function drawCellWithInteraction(i: number, j: number) {
+  const cellData = drawCell(i, j); // use your existing drawCell
+  const rect = leaflet.rectangle(
+    leaflet.latLngBounds([
+      [
+        PLAYER_LATLNG.lat + i * TILE_DEGREES,
+        PLAYER_LATLNG.lng + j * TILE_DEGREES,
+      ],
+      [
+        PLAYER_LATLNG.lat + (i + 1) * TILE_DEGREES,
+        PLAYER_LATLNG.lng + (j + 1) * TILE_DEGREES,
+      ],
+    ]),
+  ).addTo(map);
+
+  rect.on("click", () => {
+    if (!isNearbyCell(i, j)) return; // outside interaction radius
+    if (heldToken === null && cellData.tokenValue > 0) {
+      // Pick up the token
+      heldToken = { value: cellData.tokenValue };
+      cellData.tokenValue = 0; // remove from cell
+      rect.setStyle({ fillOpacity: 0.1 }); // visually indicate empty
+      console.log(`Picked up token: ${heldToken.value}`);
+    } else if (heldToken !== null && cellData.tokenValue === heldToken.value) {
+      // Merge token
+      cellData.tokenValue *= 2;
+      heldToken = null;
+      console.log(`Tokens merged! New value: ${cellData.tokenValue}`);
+    }
+  });
+
+  drawnCellsData.push({ ...cellData, rect });
+}
+
+// Redraw all cells using interactive version
+for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
+  for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
+    drawCellWithInteraction(i, j);
+  }
+}
+
+// -----------------------
+// Step 11: Display held token (Inventory UI)
+// -----------------------
+
+// Create a status panel for held token
+const inventoryDiv = document.createElement("div");
+inventoryDiv.id = "inventoryPanel";
+inventoryDiv.style.position = "absolute";
+inventoryDiv.style.top = "10px";
+inventoryDiv.style.right = "10px";
+inventoryDiv.style.padding = "8px 12px";
+inventoryDiv.style.backgroundColor = "rgba(0,0,0,0.7)";
+inventoryDiv.style.color = "white";
+inventoryDiv.style.fontFamily = "sans-serif";
+inventoryDiv.style.fontSize = "16px";
+inventoryDiv.style.borderRadius = "6px";
+inventoryDiv.style.zIndex = "1000";
+inventoryDiv.innerText = "Held Token: None";
+document.body.appendChild(inventoryDiv);
+
+// Function to update inventory display
+function updateInventoryUI() {
+  if (heldToken) {
+    inventoryDiv.innerText = `Held Token: ${heldToken.value}`;
+  } else {
+    inventoryDiv.innerText = "Held Token: None";
+  }
+}
+
+// Update the inventory whenever a token is picked up or merged
+drawCellWithInteraction; // ensure interaction code is loaded
+map.on("click", updateInventoryUI);
 
 // -----------------------
 //all previous code commented out so i can reference

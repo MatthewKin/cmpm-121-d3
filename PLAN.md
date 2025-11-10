@@ -45,9 +45,9 @@ Token Generation
 
 [x] Display token values (e.g., 0, 2, 4) as text in each cell
 
-[] Ensure token distribution stays the same between reloads
+[x] Ensure token distribution stays the same between reloads
 
-[] Store cell data (id, lat, lng, tokenValue) for later gameplay logic
+[x] Store cell data (id, lat, lng, tokenValue) for later gameplay logic
 
 Interaction & Inventory
 
