@@ -59,10 +59,14 @@ const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
 interactionCircle.addTo(map);
 
 // -----------------------
-// Step 7: Token Generation
+// Step 9: Draw cell with token value
 // -----------------------
 function drawCell(i: number, j: number) {
-  // Convert cell coordinates to lat/lng bounds
+  // Deterministic token value per cell
+  const tokenValue = Math.floor(luck([i, j, "initialValue"].toString()) * 4) *
+    2; // example: 0, 2, 4, 8
+
+  // Convert cell coordinates to lat/lng bounds relative to player
   const bounds = leaflet.latLngBounds([
     [
       PLAYER_LATLNG.lat + i * TILE_DEGREES,
@@ -73,13 +77,6 @@ function drawCell(i: number, j: number) {
       PLAYER_LATLNG.lng + (j + 1) * TILE_DEGREES,
     ],
   ]);
-
-  // Generate deterministic token value using luck()
-  const tokenValue = Math.pow(
-    2,
-    Math.floor(luck([i, j, "token"].toString()) * 4),
-  );
-  // tokenValue will be 1, 2, 4, or 8
 
   // Draw rectangle representing the cell
   const rect = leaflet.rectangle(bounds, {
@@ -99,10 +96,13 @@ function drawCell(i: number, j: number) {
     .setLatLng(center);
 
   rect.bindTooltip(tokenLabel);
+
+  // Return cell data for later use in interactions & inventory
+  return { i, j, tokenValue };
 }
 
 // -----------------------
-// Draw grid around player
+// Draw grid around player using updated drawCell
 // -----------------------
 const GRID_RADIUS = 4; // how many cells to draw in each direction from player
 

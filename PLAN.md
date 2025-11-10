@@ -41,9 +41,9 @@ Map Setup
 
 Token Generation
 
-[] Use the luck() function to generate deterministic token values per cell
+[x] Use the luck() function to generate deterministic token values per cell
 
-[] Display token values (e.g., 0, 2, 4) as text in each cell
+[x] Display token values (e.g., 0, 2, 4) as text in each cell
 
 [] Ensure token distribution stays the same between reloads
 
