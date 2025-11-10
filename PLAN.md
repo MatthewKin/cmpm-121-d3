@@ -27,7 +27,7 @@ Map Setup
 
 [x] Draw a marker for the player’s location
 
-[] Add an interaction radius circle around the player
+[x] Add an interaction radius circle around the player
 
 [] Draw a single grid cell (rectangle) centered on the player’s location
 
