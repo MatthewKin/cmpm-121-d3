@@ -29,7 +29,7 @@ Map Setup
 
 [x] Add an interaction radius circle around the player
 
-[] Draw a single grid cell (rectangle) centered on the player’s location
+[x] Draw a single grid cell (rectangle) centered on the player’s location
 
 [] Write a helper function to draw a rectangle for any given cell coordinate
 

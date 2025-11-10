@@ -60,8 +60,59 @@ const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
 });
 interactionCircle.addTo(map);
 
-// Import our luck function
+// -----------------------
+// Step 5: Grid Cell Helper
+// -----------------------
+function drawCell(i: number, j: number, tokenValue: number = 0) {
+  // Convert cell coordinates to lat/lng bounds relative to player
+  const bounds = leaflet.latLngBounds([
+    [
+      PLAYER_LATLNG.lat + i * TILE_DEGREES,
+      PLAYER_LATLNG.lng + j * TILE_DEGREES,
+    ],
+    [
+      PLAYER_LATLNG.lat + (i + 1) * TILE_DEGREES,
+      PLAYER_LATLNG.lng + (j + 1) * TILE_DEGREES,
+    ],
+  ]);
 
+  // Draw rectangle representing the cell
+  const rect = leaflet.rectangle(bounds, {
+    color: "gray",
+    weight: 1,
+    fillOpacity: 0.2,
+  }).addTo(map);
+
+  // Display token value at the center of the cell
+  const center = bounds.getCenter();
+  const tokenLabel = leaflet.tooltip({
+    permanent: true,
+    direction: "center",
+    className: "token-label",
+  })
+    .setContent(tokenValue.toString())
+    .setLatLng(center);
+
+  rect.bindTooltip(tokenLabel);
+}
+
+// -----------------------
+// Draw initial cell at player
+// -----------------------
+drawCell(0, 0, 0); // i=0, j=0 centered on player, tokenValue=0
+
+// -----------------------
+// Step 6: Draw grid around player
+// -----------------------
+const GRID_RADIUS = 4; // how many cells to draw in each direction from player
+
+for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
+  for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
+    drawCell(i, j, 0); // placeholder token value 0
+  }
+}
+
+// -----------------------
 //all previous code commented out so i can reference
 // // Create basic UI elements
 
