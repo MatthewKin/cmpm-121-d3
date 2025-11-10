@@ -59,7 +59,7 @@ Interaction & Inventory
 
 [x] Display the held token value clearly on-screen (inventory UI)
 
-[] Prevent picking up more than one token at a time
+[x] Prevent picking up more than one token at a time
 
 [] Allow placing a held token on another token of equal value
 

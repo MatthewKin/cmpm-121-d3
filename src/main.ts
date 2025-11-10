@@ -129,7 +129,7 @@ function drawVisibleGrid() {
   const minJ = Math.floor((minLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
   const maxJ = Math.ceil((maxLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
 
-  // ✅ Step 13: remove unused 'key' variable
+  // Step 13: remove unused 'key' variable
   for (let i = minI; i <= maxI; i++) {
     for (let j = minJ; j <= maxJ; j++) {
       const cellKey = `${i},${j}`;
@@ -178,16 +178,30 @@ function drawCellWithInteraction(i: number, j: number) {
 
   rect.on("click", () => {
     if (!isNearbyCell(i, j)) return;
+
+    // Prevent double pickup
+    if (heldToken !== null && cellData.tokenValue > 0) {
+      console.log(
+        "Already holding a token! Drop or merge before picking another.",
+      );
+      return;
+    }
+
+    // Pickup token
     if (heldToken === null && cellData.tokenValue > 0) {
       heldToken = { value: cellData.tokenValue };
       cellData.tokenValue = 0;
       rect.setStyle({ fillOpacity: 0.1 });
       console.log(`Picked up token: ${heldToken.value}`);
-    } else if (heldToken !== null && cellData.tokenValue === heldToken.value) {
+    } // Merge tokens of equal value
+    else if (heldToken !== null && cellData.tokenValue === heldToken.value) {
       cellData.tokenValue *= 2;
       heldToken = null;
+      rect.setStyle({ fillOpacity: 0.4 });
       console.log(`Tokens merged! New value: ${cellData.tokenValue}`);
     }
+
+    updateInventoryUI();
   });
 
   drawnCellsData.push({ ...cellData, rect });
