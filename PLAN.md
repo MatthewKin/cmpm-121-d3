@@ -51,13 +51,13 @@ Token Generation
 
 Interaction & Inventory
 
-[] Limit interaction to cells within ~3 cells of the player’s position
+[x] Limit interaction to cells within ~3 cells of the player’s position
 
-[] Implement click handling for grid cells
+[x] Implement click handling for grid cells
 
-[] Picking up a token removes it from the cell
+[x] Picking up a token removes it from the cell
 
-[] Display the held token value clearly on-screen (inventory UI)
+[x] Display the held token value clearly on-screen (inventory UI)
 
 [] Prevent picking up more than one token at a time
 

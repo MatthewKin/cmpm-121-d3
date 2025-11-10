@@ -61,8 +61,6 @@ interactionCircle.addTo(map);
 // -----------------------
 // Step 9: Draw cell with token value
 // -----------------------
-
-// Store all cells for interaction purposes
 const cells: {
   i: number;
   j: number;
@@ -96,12 +94,9 @@ function drawCell(i: number, j: number) {
     permanent: true,
     direction: "center",
     className: "token-label",
-  }).setContent(tokenValue.toString())
-    .setLatLng(center);
+  }).setContent(tokenValue.toString()).setLatLng(center);
 
   rect.bindTooltip(tokenLabel);
-
-  // Save cell for interaction purposes
   cells.push({ i, j, tokenValue, rect });
 
   return { i, j, tokenValue, rect };
@@ -111,7 +106,6 @@ function drawCell(i: number, j: number) {
 // Draw grid around player
 // -----------------------
 const GRID_RADIUS = 4;
-
 for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
   for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
     drawCell(i, j);
@@ -135,12 +129,13 @@ function drawVisibleGrid() {
   const minJ = Math.floor((minLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
   const maxJ = Math.ceil((maxLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
 
+  // ✅ Step 13: remove unused 'key' variable
   for (let i = minI; i <= maxI; i++) {
     for (let j = minJ; j <= maxJ; j++) {
-      const key = `${i},${j}`;
-      if (!drawnCells.has(key)) {
+      const cellKey = `${i},${j}`;
+      if (!drawnCells.has(cellKey)) {
         drawCell(i, j);
-        drawnCells.add(key);
+        drawnCells.add(cellKey);
       }
     }
   }
@@ -152,17 +147,13 @@ map.on("moveend", drawVisibleGrid);
 // -----------------------
 // Step 10: Interaction & Inventory
 // -----------------------
-
-// Track currently held token
 let heldToken: { value: number } | null = null;
 
-// Check if a cell is within interaction radius
 function isNearbyCell(i: number, j: number) {
   return Math.abs(i) <= INTERACTION_RADIUS_CELLS &&
     Math.abs(j) <= INTERACTION_RADIUS_CELLS;
 }
 
-// Add click handling for all drawn cells
 const drawnCellsData: {
   i: number;
   j: number;
@@ -171,7 +162,7 @@ const drawnCellsData: {
 }[] = [];
 
 function drawCellWithInteraction(i: number, j: number) {
-  const cellData = drawCell(i, j); // use your existing drawCell
+  const cellData = drawCell(i, j);
   const rect = leaflet.rectangle(
     leaflet.latLngBounds([
       [
@@ -186,15 +177,13 @@ function drawCellWithInteraction(i: number, j: number) {
   ).addTo(map);
 
   rect.on("click", () => {
-    if (!isNearbyCell(i, j)) return; // outside interaction radius
+    if (!isNearbyCell(i, j)) return;
     if (heldToken === null && cellData.tokenValue > 0) {
-      // Pick up the token
       heldToken = { value: cellData.tokenValue };
-      cellData.tokenValue = 0; // remove from cell
-      rect.setStyle({ fillOpacity: 0.1 }); // visually indicate empty
+      cellData.tokenValue = 0;
+      rect.setStyle({ fillOpacity: 0.1 });
       console.log(`Picked up token: ${heldToken.value}`);
     } else if (heldToken !== null && cellData.tokenValue === heldToken.value) {
-      // Merge token
       cellData.tokenValue *= 2;
       heldToken = null;
       console.log(`Tokens merged! New value: ${cellData.tokenValue}`);
@@ -204,7 +193,6 @@ function drawCellWithInteraction(i: number, j: number) {
   drawnCellsData.push({ ...cellData, rect });
 }
 
-// Redraw all cells using interactive version
 for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
   for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
     drawCellWithInteraction(i, j);
@@ -214,8 +202,6 @@ for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
 // -----------------------
 // Step 11: Display held token (Inventory UI)
 // -----------------------
-
-// Create a status panel for held token
 const inventoryDiv = document.createElement("div");
 inventoryDiv.id = "inventoryPanel";
 inventoryDiv.style.position = "absolute";
@@ -231,17 +217,12 @@ inventoryDiv.style.zIndex = "1000";
 inventoryDiv.innerText = "Held Token: None";
 document.body.appendChild(inventoryDiv);
 
-// Function to update inventory display
 function updateInventoryUI() {
-  if (heldToken) {
-    inventoryDiv.innerText = `Held Token: ${heldToken.value}`;
-  } else {
-    inventoryDiv.innerText = "Held Token: None";
-  }
+  inventoryDiv.innerText = heldToken
+    ? `Held Token: ${heldToken.value}`
+    : "Held Token: None";
 }
 
-// Update the inventory whenever a token is picked up or merged
-drawCellWithInteraction; // ensure interaction code is loaded
 map.on("click", updateInventoryUI);
 
 // -----------------------
