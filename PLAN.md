@@ -37,7 +37,7 @@ Map Setup
 
 [x] Redraw the grid on map movement (moveend) without duplicates
 
-[] Add labels or markers to each cell for displaying token content
+[x] Add labels or markers to each cell for displaying token content
 
 Token Generation
 

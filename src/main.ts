@@ -59,12 +59,31 @@ const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
 interactionCircle.addTo(map);
 
 // -----------------------
-// Step 9: Draw cell with token value
+// Step 9 & 10: Draw cell with token value & store data
 // -----------------------
+const cellsData: Record<string, { i: number; j: number; tokenValue: number }> =
+  {};
+
+// Load cell data from localStorage if it exists
+const saved = localStorage.getItem("cellsData");
+if (saved) {
+  const parsed = JSON.parse(saved);
+  for (const key in parsed) {
+    cellsData[key] = parsed[key];
+  }
+}
+
 function drawCell(i: number, j: number) {
-  // Deterministic token value per cell
-  const tokenValue = Math.floor(luck([i, j, "initialValue"].toString()) * 4) *
-    2; // example: 0, 2, 4, 8
+  const key = `${i},${j}`;
+
+  // If we already have token data, use it; otherwise generate new
+  let tokenValue: number;
+  if (cellsData[key]) {
+    tokenValue = cellsData[key].tokenValue;
+  } else {
+    tokenValue = Math.pow(2, Math.floor(luck([i, j, "token"].toString()) * 4));
+    cellsData[key] = { i, j, tokenValue };
+  }
 
   // Convert cell coordinates to lat/lng bounds relative to player
   const bounds = leaflet.latLngBounds([
@@ -97,12 +116,16 @@ function drawCell(i: number, j: number) {
 
   rect.bindTooltip(tokenLabel);
 
-  // Return cell data for later use in interactions & inventory
   return { i, j, tokenValue };
 }
 
+// Save cell data to localStorage
+function saveCellsData() {
+  localStorage.setItem("cellsData", JSON.stringify(cellsData));
+}
+
 // -----------------------
-// Draw grid around player using updated drawCell
+// Draw grid around player
 // -----------------------
 const GRID_RADIUS = 4; // how many cells to draw in each direction from player
 
@@ -115,8 +138,6 @@ for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
 // -----------------------
 // Step 8: Redraw grid on map movement
 // -----------------------
-
-// Keep track of already drawn cells by their i,j keys
 const drawnCells = new Set<string>();
 
 function drawVisibleGrid() {
@@ -147,6 +168,9 @@ drawVisibleGrid();
 
 // Redraw whenever the map is moved
 map.on("moveend", drawVisibleGrid);
+
+// Save cell data on page unload
+globalThis.addEventListener("beforeunload", saveCellsData);
 
 // -----------------------
 //all previous code commented out so i can reference
