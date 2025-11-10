@@ -31,11 +31,11 @@ Map Setup
 
 [x] Draw a single grid cell (rectangle) centered on the player’s location
 
-[] Write a helper function to draw a rectangle for any given cell coordinate
+[x] Write a helper function to draw a rectangle for any given cell coordinate
 
-[] Use nested loops to draw a grid of cells covering the visible map area
+[x] Use nested loops to draw a grid of cells covering the visible map area
 
-[] Redraw the grid on map movement (moveend) without duplicates
+[x] Redraw the grid on map movement (moveend) without duplicates
 
 [] Add labels or markers to each cell for displaying token content
 

@@ -113,6 +113,42 @@ for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
 }
 
 // -----------------------
+// Step 8: Redraw grid on map movement
+// -----------------------
+
+// Keep track of already drawn cells by their i,j keys
+const drawnCells = new Set<string>();
+
+function drawVisibleGrid() {
+  const bounds = map.getBounds();
+  const minLat = bounds.getSouth();
+  const maxLat = bounds.getNorth();
+  const minLng = bounds.getWest();
+  const maxLng = bounds.getEast();
+
+  const minI = Math.floor((minLat - PLAYER_LATLNG.lat) / TILE_DEGREES);
+  const maxI = Math.ceil((maxLat - PLAYER_LATLNG.lat) / TILE_DEGREES);
+  const minJ = Math.floor((minLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
+  const maxJ = Math.ceil((maxLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
+
+  for (let i = minI; i <= maxI; i++) {
+    for (let j = minJ; j <= maxJ; j++) {
+      const key = `${i},${j}`;
+      if (!drawnCells.has(key)) {
+        drawCell(i, j);
+        drawnCells.add(key);
+      }
+    }
+  }
+}
+
+// Initially draw the visible grid
+drawVisibleGrid();
+
+// Redraw whenever the map is moved
+map.on("moveend", drawVisibleGrid);
+
+// -----------------------
 //all previous code commented out so i can reference
 // // Create basic UI elements
 
