@@ -1,22 +1,17 @@
 // @deno-types="npm:@types/leaflet"
-
-// Style sheets
-import "leaflet/dist/leaflet.css"; // supporting style for Leaflet
-import "./style.css"; // student-controlled page style
-
-// Fix missing marker images
-import "./_leafletWorkaround.ts"; // fixes for missing Leaflet images
-
-// @deno-types="npm:@types/leaflet"
 import leaflet from "leaflet";
-import luck from "./_luck.ts"; // deterministic token generator
+import luck from "./_luck.ts";
+
+import "leaflet/dist/leaflet.css";
+import "./_leafletWorkaround.ts";
+import "./style.css";
 
 // -----------------------
-// Constants & Parameters
+// Constants
 // -----------------------
-const TILE_DEGREES = 0.0001; // size of each grid cell
-const GAMEPLAY_ZOOM_LEVEL = 19; // fixed zoom level
-const INTERACTION_RADIUS_CELLS = 3; // how far the player can interact
+const TILE_DEGREES = 0.0001;
+const GAMEPLAY_ZOOM_LEVEL = 19;
+const INTERACTION_RADIUS_CELLS = 3;
 const PLAYER_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
 
 // -----------------------
@@ -35,43 +30,134 @@ const map = leaflet.map(mapDiv, {
   scrollWheelZoom: false,
 });
 
-leaflet
-  .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  })
-  .addTo(map);
+leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution:
+    '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
 
 // -----------------------
 // Player Marker & Interaction Circle
 // -----------------------
-const playerMarker = leaflet.marker(PLAYER_LATLNG).addTo(map);
-playerMarker.bindTooltip("omg thats you :D");
+leaflet.marker(PLAYER_LATLNG).addTo(map).bindTooltip("omg thats you :D");
 
 const INTERACTION_RADIUS_METERS = INTERACTION_RADIUS_CELLS * TILE_DEGREES *
   111_000;
-const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
+leaflet.circle(PLAYER_LATLNG, {
   radius: INTERACTION_RADIUS_METERS,
   color: "blue",
   fillOpacity: 0.1,
-});
-interactionCircle.addTo(map);
+}).addTo(map);
 
 // -----------------------
-// Step 9: Draw cell with token value
+// Grid & Cells
 // -----------------------
-const cells: {
+type Cell = {
   i: number;
   j: number;
   tokenValue: number;
   rect: leaflet.Rectangle;
-}[] = [];
+};
+const cells: Cell[] = [];
+const drawnCells = new Set<string>();
+let heldToken: { value: number } | null = null;
 
-function drawCell(i: number, j: number) {
+// Inventory UI
+const inventoryDiv = document.createElement("div");
+Object.assign(inventoryDiv.style, {
+  position: "absolute",
+  top: "10px",
+  right: "10px",
+  padding: "8px 12px",
+  backgroundColor: "rgba(0,0,0,0.7)",
+  color: "white",
+  fontFamily: "sans-serif",
+  fontSize: "16px",
+  borderRadius: "6px",
+  zIndex: "1000",
+});
+inventoryDiv.innerText = "Held Token: None";
+document.body.appendChild(inventoryDiv);
+
+function updateInventoryUI() {
+  inventoryDiv.innerText = heldToken
+    ? `Held Token: ${heldToken.value}`
+    : "Held Token: None";
+  checkWinCondition();
+}
+
+// -----------------------
+// Save/Load
+// -----------------------
+function saveGameState() {
+  const state = cells.map((c) => ({
+    i: c.i,
+    j: c.j,
+    tokenValue: c.tokenValue,
+  }));
+  localStorage.setItem("cells", JSON.stringify(state));
+  localStorage.setItem("heldToken", JSON.stringify(heldToken));
+}
+
+function loadGameState() {
+  const savedCells = JSON.parse(localStorage.getItem("cells") || "[]");
+  const savedHeldToken = JSON.parse(
+    localStorage.getItem("heldToken") || "null",
+  );
+  if (savedHeldToken) heldToken = savedHeldToken;
+
+  for (const sc of savedCells) {
+    const cell = cells.find((c) => c.i === sc.i && c.j === sc.j);
+    if (cell) {
+      cell.tokenValue = sc.tokenValue;
+      const center = cell.rect.getBounds().getCenter();
+      cell.rect.unbindTooltip();
+      cell.rect.bindTooltip(
+        leaflet.tooltip({
+          permanent: true,
+          direction: "center",
+          className: "token-label",
+        }).setContent(cell.tokenValue.toString()).setLatLng(center),
+      );
+    }
+  }
+
+  updateInventoryUI();
+}
+
+// -----------------------
+// Win Condition
+// -----------------------
+function checkWinCondition() {
+  if (heldToken && (heldToken.value === 8 || heldToken.value === 16)) {
+    if (!document.getElementById("winMessage")) {
+      const winDiv = document.createElement("div");
+      winDiv.id = "winMessage";
+      Object.assign(winDiv.style, {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        padding: "20px 40px",
+        backgroundColor: "rgba(0,128,0,0.8)",
+        color: "white",
+        fontSize: "32px",
+        fontFamily: "sans-serif",
+        borderRadius: "12px",
+        zIndex: "2000",
+      });
+      winDiv.innerText = "You crafted a high-value token! 🎉";
+      document.body.appendChild(winDiv);
+    }
+  }
+}
+
+// -----------------------
+// Draw Cell
+// -----------------------
+function drawCell(i: number, j: number): Cell {
   const tokenValue = Math.floor(luck([i, j, "initialValue"].toString()) * 4) *
     2;
-
   const bounds = leaflet.latLngBounds([
     [
       PLAYER_LATLNG.lat + i * TILE_DEGREES,
@@ -88,125 +174,85 @@ function drawCell(i: number, j: number) {
     weight: 1,
     fillOpacity: 0.2,
   }).addTo(map);
-
   const center = bounds.getCenter();
-  const tokenLabel = leaflet.tooltip({
-    permanent: true,
-    direction: "center",
-    className: "token-label",
-  }).setContent(tokenValue.toString()).setLatLng(center);
+  rect.bindTooltip(
+    leaflet.tooltip({
+      permanent: true,
+      direction: "center",
+      className: "token-label",
+    })
+      .setContent(tokenValue.toString()).setLatLng(center),
+  );
 
-  rect.bindTooltip(tokenLabel);
-  cells.push({ i, j, tokenValue, rect });
-
-  return { i, j, tokenValue, rect };
+  const cell: Cell = { i, j, tokenValue, rect };
+  cells.push(cell);
+  drawnCells.add(`${i},${j}`);
+  return cell;
 }
 
 // -----------------------
-// Draw grid around player
+// Interaction
 // -----------------------
-const GRID_RADIUS = 4;
-for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
-  for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
-    drawCell(i, j);
-  }
-}
-
-// -----------------------
-// Step 8: Redraw grid on map movement
-// -----------------------
-const drawnCells = new Set<string>();
-
-function drawVisibleGrid() {
-  const bounds = map.getBounds();
-  const minLat = bounds.getSouth();
-  const maxLat = bounds.getNorth();
-  const minLng = bounds.getWest();
-  const maxLng = bounds.getEast();
-
-  const minI = Math.floor((minLat - PLAYER_LATLNG.lat) / TILE_DEGREES);
-  const maxI = Math.ceil((maxLat - PLAYER_LATLNG.lat) / TILE_DEGREES);
-  const minJ = Math.floor((minLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
-  const maxJ = Math.ceil((maxLng - PLAYER_LATLNG.lng) / TILE_DEGREES);
-
-  // Step 13: remove unused 'key' variable
-  for (let i = minI; i <= maxI; i++) {
-    for (let j = minJ; j <= maxJ; j++) {
-      const cellKey = `${i},${j}`;
-      if (!drawnCells.has(cellKey)) {
-        drawCell(i, j);
-        drawnCells.add(cellKey);
-      }
-    }
-  }
-}
-
-drawVisibleGrid();
-map.on("moveend", drawVisibleGrid);
-
-// -----------------------
-// Step 10: Interaction & Inventory
-// -----------------------
-let heldToken: { value: number } | null = null;
-
 function isNearbyCell(i: number, j: number) {
   return Math.abs(i) <= INTERACTION_RADIUS_CELLS &&
     Math.abs(j) <= INTERACTION_RADIUS_CELLS;
 }
 
-const drawnCellsData: {
-  i: number;
-  j: number;
-  tokenValue: number;
-  rect: leaflet.Rectangle;
-}[] = [];
-
 function drawCellWithInteraction(i: number, j: number) {
-  const cellData = drawCell(i, j);
-  const rect = leaflet.rectangle(
-    leaflet.latLngBounds([
-      [
-        PLAYER_LATLNG.lat + i * TILE_DEGREES,
-        PLAYER_LATLNG.lng + j * TILE_DEGREES,
-      ],
-      [
-        PLAYER_LATLNG.lat + (i + 1) * TILE_DEGREES,
-        PLAYER_LATLNG.lng + (j + 1) * TILE_DEGREES,
-      ],
-    ]),
-  ).addTo(map);
-
-  rect.on("click", () => {
+  const cell = drawCell(i, j);
+  cell.rect.on("click", () => {
     if (!isNearbyCell(i, j)) return;
 
-    // Prevent double pickup
-    if (heldToken !== null && cellData.tokenValue > 0) {
-      console.log(
-        "Already holding a token! Drop or merge before picking another.",
+    // Merge
+    if (heldToken && cell.tokenValue > 0) {
+      if (cell.tokenValue === heldToken.value) {
+        cell.tokenValue *= 2;
+        heldToken = null;
+        cell.rect.setStyle({ fillOpacity: 0.4 });
+        const center = cell.rect.getBounds().getCenter();
+        cell.rect.unbindTooltip();
+        cell.rect.bindTooltip(
+          leaflet.tooltip({
+            permanent: true,
+            direction: "center",
+            className: "token-label",
+          })
+            .setContent(cell.tokenValue.toString()).setLatLng(center),
+        );
+        updateInventoryUI();
+        saveGameState();
+        return;
+      } else {
+        console.log("Already holding a token!");
+        return;
+      }
+    }
+
+    // Pickup
+    if (!heldToken && cell.tokenValue > 0) {
+      heldToken = { value: cell.tokenValue };
+      cell.tokenValue = 0;
+      cell.rect.setStyle({ fillOpacity: 0.1 });
+      const center = cell.rect.getBounds().getCenter();
+      cell.rect.unbindTooltip();
+      cell.rect.bindTooltip(
+        leaflet.tooltip({
+          permanent: true,
+          direction: "center",
+          className: "token-label",
+        })
+          .setContent(cell.tokenValue.toString()).setLatLng(center),
       );
-      return;
+      updateInventoryUI();
+      saveGameState();
     }
-
-    // Pickup token
-    if (heldToken === null && cellData.tokenValue > 0) {
-      heldToken = { value: cellData.tokenValue };
-      cellData.tokenValue = 0;
-      rect.setStyle({ fillOpacity: 0.1 });
-      console.log(`Picked up token: ${heldToken.value}`);
-    } // Merge tokens of equal value
-    else if (heldToken !== null && cellData.tokenValue === heldToken.value) {
-      cellData.tokenValue *= 2;
-      heldToken = null;
-      rect.setStyle({ fillOpacity: 0.4 });
-      console.log(`Tokens merged! New value: ${cellData.tokenValue}`);
-    }
-
-    updateInventoryUI();
   });
-
-  drawnCellsData.push({ ...cellData, rect });
 }
 
+// -----------------------
+// Initial Grid
+// -----------------------
+const GRID_RADIUS = 4;
 for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
   for (let j = -GRID_RADIUS; j <= GRID_RADIUS; j++) {
     drawCellWithInteraction(i, j);
@@ -214,30 +260,38 @@ for (let i = -GRID_RADIUS; i <= GRID_RADIUS; i++) {
 }
 
 // -----------------------
-// Step 11: Display held token (Inventory UI)
+// Draw Visible Grid
 // -----------------------
-const inventoryDiv = document.createElement("div");
-inventoryDiv.id = "inventoryPanel";
-inventoryDiv.style.position = "absolute";
-inventoryDiv.style.top = "10px";
-inventoryDiv.style.right = "10px";
-inventoryDiv.style.padding = "8px 12px";
-inventoryDiv.style.backgroundColor = "rgba(0,0,0,0.7)";
-inventoryDiv.style.color = "white";
-inventoryDiv.style.fontFamily = "sans-serif";
-inventoryDiv.style.fontSize = "16px";
-inventoryDiv.style.borderRadius = "6px";
-inventoryDiv.style.zIndex = "1000";
-inventoryDiv.innerText = "Held Token: None";
-document.body.appendChild(inventoryDiv);
+function drawVisibleGrid() {
+  const bounds = map.getBounds();
+  const minI = Math.floor(
+    (bounds.getSouth() - PLAYER_LATLNG.lat) / TILE_DEGREES,
+  );
+  const maxI = Math.ceil(
+    (bounds.getNorth() - PLAYER_LATLNG.lat) / TILE_DEGREES,
+  );
+  const minJ = Math.floor(
+    (bounds.getWest() - PLAYER_LATLNG.lng) / TILE_DEGREES,
+  );
+  const maxJ = Math.ceil((bounds.getEast() - PLAYER_LATLNG.lng) / TILE_DEGREES);
 
-function updateInventoryUI() {
-  inventoryDiv.innerText = heldToken
-    ? `Held Token: ${heldToken.value}`
-    : "Held Token: None";
+  for (let i = minI; i <= maxI; i++) {
+    for (let j = minJ; j <= maxJ; j++) {
+      const key = `${i},${j}`;
+      if (!drawnCells.has(key)) {
+        drawCellWithInteraction(i, j);
+      }
+    }
+  }
 }
 
-map.on("click", updateInventoryUI);
+map.on("moveend", drawVisibleGrid);
+drawVisibleGrid();
+
+// -----------------------
+// Load Previous State
+// -----------------------
+loadGameState();
 
 // -----------------------
 //all previous code commented out so i can reference

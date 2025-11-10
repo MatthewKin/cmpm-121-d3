@@ -61,19 +61,19 @@ Interaction & Inventory
 
 [x] Prevent picking up more than one token at a time
 
-[] Allow placing a held token on another token of equal value
+[x] Allow placing a held token on another token of equal value
 
-[] When equal tokens merge, replace them with a new token of double value
+[x] When equal tokens merge, replace them with a new token of double value
 
 Crafting & Win Condition
 
-[] Update the cell and inventory state after crafting
+[x] Update the cell and inventory state after crafting
 
-[] Store changes persistently in localStorage so state survives reloads
+[x] Store changes persistently in localStorage so state survives reloads
 
-[] Detect when the player holds a token of value 8 or 16
+[x] Detect when the player holds a token of value 8 or 16
 
-[] Display a win message or visual cue when the goal is achieved
+[x] Display a win message or visual cue when the goal is achieved
 
 Polish
 
