@@ -74,12 +74,14 @@ function movePlayer(di: number, dj: number) {
   const newLng = PLAYER_LATLNG.lng + playerJ * TILE_DEGREES;
   const newPos = leaflet.latLng(newLat, newLng);
 
-  // ✅ Update existing marker and circle instead of adding new ones
+  // Update existing marker and circle instead of adding new ones
   playerMarker.setLatLng(newPos);
   interactionCircle.setLatLng(newPos);
 
   map.panTo(newPos);
   drawVisibleGrid();
+
+  highlightNearbyCells();
 }
 
 // -----------------------
@@ -398,9 +400,31 @@ function drawVisibleGrid() {
   }
 }
 
+// -----------------------
+// Highlight interactable cells
+// -----------------------
+function highlightNearbyCells() {
+  for (const cell of cells) {
+    if (isNearbyCell(cell.i, cell.j)) {
+      cell.rect.setStyle({
+        color: "gold",
+        weight: 2,
+        fillOpacity: cell.tokenValue > 0 ? 0.5 : 0.2,
+      });
+    } else {
+      cell.rect.setStyle({
+        color: "gray",
+        weight: 1,
+        fillOpacity: cell.tokenValue > 0 ? 0.4 : 0.1,
+      });
+    }
+  }
+}
+
 map.on("moveend", drawVisibleGrid);
 drawVisibleGrid();
 loadGameState();
+highlightNearbyCells();
 
 // -----------------------
 //all previous code commented out so i can reference

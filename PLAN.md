@@ -104,7 +104,6 @@ Crafting & Win
 [x] Display a win message when held token >= WIN_THRESHOLD
 
 Polish / Performance (optional)
-[] Optimize redraw logic to avoid unnecessary recreation
-[] Add color tint to cells inside interaction range
-[] Final styling of token markers (CSS)
-[] Final D3.b commit & cleanup
+[x] Add color tint to cells inside interaction range
+[x] Final styling of token markers (CSS)
+[x] Final D3.b commit & cleanup
