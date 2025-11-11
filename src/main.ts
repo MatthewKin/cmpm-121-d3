@@ -129,7 +129,7 @@ function loadGameState() {
 // Win Condition
 // -----------------------
 function checkWinCondition() {
-  if (heldToken && (heldToken.value === 8 || heldToken.value === 16)) {
+  if (heldToken && (heldToken.value === 32 || heldToken.value === 64)) {
     if (!document.getElementById("winMessage")) {
       const winDiv = document.createElement("div");
       winDiv.id = "winMessage";
@@ -203,36 +203,20 @@ function drawCellWithInteraction(i: number, j: number) {
   cell.rect.on("click", () => {
     if (!isNearbyCell(i, j)) return;
 
-    // Merge
-    if (heldToken && cell.tokenValue > 0) {
-      if (cell.tokenValue === heldToken.value) {
+    // --- Case 1: Player is holding something ---
+    if (heldToken) {
+      if (cell.tokenValue === heldToken.value && cell.tokenValue !== 0) {
+        // Merge equal tokens
         cell.tokenValue *= 2;
         heldToken = null;
-        cell.rect.setStyle({ fillOpacity: 0.4 });
-        const center = cell.rect.getBounds().getCenter();
-        cell.rect.unbindTooltip();
-        cell.rect.bindTooltip(
-          leaflet.tooltip({
-            permanent: true,
-            direction: "center",
-            className: "token-label",
-          })
-            .setContent(cell.tokenValue.toString()).setLatLng(center),
-        );
-        updateInventoryUI();
-        saveGameState();
-        return;
       } else {
-        console.log("Already holding a token!");
-        return;
+        // Place or swap the token, even if cell is 0
+        const temp = cell.tokenValue;
+        cell.tokenValue = heldToken.value;
+        heldToken = temp > 0 ? { value: temp } : null;
       }
-    }
 
-    // Pickup
-    if (!heldToken && cell.tokenValue > 0) {
-      heldToken = { value: cell.tokenValue };
-      cell.tokenValue = 0;
-      cell.rect.setStyle({ fillOpacity: 0.1 });
+      // Update visuals
       const center = cell.rect.getBounds().getCenter();
       cell.rect.unbindTooltip();
       cell.rect.bindTooltip(
@@ -240,9 +224,29 @@ function drawCellWithInteraction(i: number, j: number) {
           permanent: true,
           direction: "center",
           className: "token-label",
-        })
-          .setContent(cell.tokenValue.toString()).setLatLng(center),
+        }).setContent(cell.tokenValue.toString()).setLatLng(center),
       );
+      cell.rect.setStyle({ fillOpacity: cell.tokenValue > 0 ? 0.4 : 0.1 });
+      updateInventoryUI();
+      saveGameState();
+      return;
+    }
+
+    // --- Case 2: Pickup ---
+    if (!heldToken && cell.tokenValue > 0) {
+      heldToken = { value: cell.tokenValue };
+      cell.tokenValue = 0;
+
+      const center = cell.rect.getBounds().getCenter();
+      cell.rect.unbindTooltip();
+      cell.rect.bindTooltip(
+        leaflet.tooltip({
+          permanent: true,
+          direction: "center",
+          className: "token-label",
+        }).setContent(cell.tokenValue.toString()).setLatLng(center),
+      );
+      cell.rect.setStyle({ fillOpacity: 0.1 });
       updateInventoryUI();
       saveGameState();
     }

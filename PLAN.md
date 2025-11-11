@@ -17,7 +17,7 @@ World of Bits is a map-based game where players explore a virtual grid, collect 
 Key technical challenge: Can you assemble a map-based user interface using the Leaflet mapping framework?
 Key gameplay challenge: Can players collect and craft tokens from nearby locations to finally make one of sufficiently high value?
 
-### Steps
+### Steps D3.a
 
 Map Setup
 
@@ -67,15 +67,15 @@ Interaction & Inventory
 
 Crafting & Win Condition
 
-[x] Update the cell and inventory state after crafting
+[] Update the cell and inventory state after crafting
 
-[x] Store changes persistently in localStorage so state survives reloads
+[] Store changes persistently in localStorage so state survives reloads
 
-[x] Detect when the player holds a token of value 8 or 16
+[] Detect when the player holds a token of value 8 or 16
 
-[x] Display a win message or visual cue when the goal is achieved
+[] Display a win message or visual cue when the goal is achieved
 
-Polish
+Polish (if I have extra time)
 
 [] Clear and redraw the grid efficiently on zoom/pan
 
@@ -84,3 +84,38 @@ Polish
 [] Style the token markers using CSS for readability
 
 [] Clean up performance and commit final D3.a version
+
+### D3.b Globe-spanning Gameplay
+
+Player Movement (NSEW), movement should be exactly 1 cell
+Keyboard inputs should be arrow keys to move player
+
+### Steps D3.b
+
+Map / Interface
+[] Add movement UI (N/S/E/W) that moves player by exactly one cell
+[] Allow keyboard arrow keys to move player by one cell
+[] Anchor the grid to Null Island (0,0) — earth-spanning coordinate system
+[x] Cells spawn deterministically using luck() based on cell i,j
+[x] Map redraws on moveend and when player moves
+[x] Player marker & interaction circle update when player moves
+[x] Cells are drawn with labels showing token values
+
+Gameplay / Memory
+[x] Cells are memoryless: when a cell leaves the visible screen it is removed
+[x] Returning to a cell re-spawns it deterministically (so farming is possible)
+[x] Interaction is limited to cells within INTERACTION_RADIUS_CELLS
+[x] Picking up a token removes it from the cell (temporary)
+[x] Merging equal tokens doubles the cell's token value
+[x] Inventory UI displays the currently held token
+
+Crafting & Win
+[x] Increase crafting target (WIN_THRESHOLD = 32)
+[x] Display a win message when held token >= WIN_THRESHOLD
+
+Polish / Performance (optional)
+[] Despawn off-screen layers efficiently (already implemented basic despawn)
+[] Optimize redraw logic to avoid unnecessary recreation
+[] Add color tint to cells inside interaction range
+[] Final styling of token markers (CSS)
+[] Final D3.b commit & cleanup
