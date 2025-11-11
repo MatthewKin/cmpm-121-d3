@@ -12,7 +12,7 @@ import "./style.css";
 const TILE_DEGREES = 0.0001;
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const INTERACTION_RADIUS_CELLS = 3;
-const PLAYER_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
+const PLAYER_LATLNG = leaflet.latLng(0, 0);
 
 // -----------------------
 // Map Setup
@@ -39,11 +39,12 @@ leaflet.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 // -----------------------
 // Player Marker & Interaction Circle
 // -----------------------
-leaflet.marker(PLAYER_LATLNG).addTo(map).bindTooltip("omg thats you :D");
-
 const INTERACTION_RADIUS_METERS = INTERACTION_RADIUS_CELLS * TILE_DEGREES *
   111_000;
-leaflet.circle(PLAYER_LATLNG, {
+const playerMarker = leaflet.marker(PLAYER_LATLNG).addTo(map).bindTooltip(
+  "omg thats you :D",
+);
+const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
   radius: INTERACTION_RADIUS_METERS,
   color: "blue",
   fillOpacity: 0.1,
@@ -62,7 +63,28 @@ const cells: Cell[] = [];
 const drawnCells = new Set<string>();
 let heldToken: { value: number } | null = null;
 
+let playerI = 0;
+let playerJ = 0;
+
+function movePlayer(di: number, dj: number) {
+  playerI += di;
+  playerJ += dj;
+
+  const newLat = PLAYER_LATLNG.lat + playerI * TILE_DEGREES;
+  const newLng = PLAYER_LATLNG.lng + playerJ * TILE_DEGREES;
+  const newPos = leaflet.latLng(newLat, newLng);
+
+  // ✅ Update existing marker and circle instead of adding new ones
+  playerMarker.setLatLng(newPos);
+  interactionCircle.setLatLng(newPos);
+
+  map.panTo(newPos);
+  drawVisibleGrid();
+}
+
+// -----------------------
 // Inventory UI
+// -----------------------
 const inventoryDiv = document.createElement("div");
 Object.assign(inventoryDiv.style, {
   position: "absolute",
@@ -85,6 +107,61 @@ function updateInventoryUI() {
     : "Held Token: None";
   checkWinCondition();
 }
+
+// -----------------------
+// Movement UI
+// -----------------------
+const moveDiv = document.createElement("div");
+Object.assign(moveDiv.style, {
+  position: "absolute",
+  bottom: "20px",
+  left: "50%",
+  transform: "translateX(-50%)",
+  display: "grid",
+  gridTemplateColumns: "repeat(3, 50px)",
+  gridTemplateRows: "repeat(3, 50px)",
+  gap: "5px",
+  zIndex: "1000",
+});
+
+const directions: Record<string, [number, number]> = {
+  "↑": [1, 0],
+  "↓": [-1, 0],
+  "←": [0, -1],
+  "→": [0, 1],
+};
+
+const buttons: Record<string, HTMLButtonElement> = {};
+for (const [symbol, [di, dj]] of Object.entries(directions)) {
+  const btn = document.createElement("button");
+  btn.innerText = symbol;
+  Object.assign(btn.style, {
+    fontSize: "24px",
+    borderRadius: "8px",
+    cursor: "pointer",
+  });
+  btn.onclick = () => movePlayer(di, dj);
+  buttons[symbol] = btn;
+}
+
+// Layout
+moveDiv.appendChild(document.createElement("div"));
+moveDiv.appendChild(buttons["↑"]);
+moveDiv.appendChild(document.createElement("div"));
+moveDiv.appendChild(buttons["←"]);
+moveDiv.appendChild(document.createElement("div"));
+moveDiv.appendChild(buttons["→"]);
+moveDiv.appendChild(document.createElement("div"));
+moveDiv.appendChild(buttons["↓"]);
+moveDiv.appendChild(document.createElement("div"));
+document.body.appendChild(moveDiv);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") movePlayer(1, 0);
+  if (e.key === "ArrowDown") movePlayer(-1, 0);
+  if (e.key === "ArrowLeft") movePlayer(0, -1);
+  if (e.key === "ArrowRight") movePlayer(0, 1);
+});
 
 // -----------------------
 // Save/Load
@@ -146,7 +223,7 @@ function checkWinCondition() {
         borderRadius: "12px",
         zIndex: "2000",
       });
-      winDiv.innerText = "You crafted a high-value token! 🎉";
+      winDiv.innerText = "You Win! 🎉";
       document.body.appendChild(winDiv);
     }
   }
@@ -155,6 +232,38 @@ function checkWinCondition() {
 // -----------------------
 // Draw Cell
 // -----------------------
+
+function showPopupMessage(message: string) {
+  const existing = document.getElementById("popupMessage");
+  if (existing) existing.remove();
+
+  const popup = document.createElement("div");
+  popup.id = "popupMessage";
+  Object.assign(popup.style, {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    backgroundColor: "rgba(255,0,0,0.85)",
+    color: "white",
+    padding: "16px 24px",
+    borderRadius: "8px",
+    fontFamily: "sans-serif",
+    fontSize: "20px",
+    zIndex: "3000",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+    transition: "opacity 0.3s",
+  });
+  popup.innerText = message;
+  document.body.appendChild(popup);
+
+  // fade out after 2 seconds
+  setTimeout(() => {
+    popup.style.opacity = "0";
+    setTimeout(() => popup.remove(), 300);
+  }, 1500);
+}
+
 function drawCell(i: number, j: number): Cell {
   const tokenValue = Math.floor(luck([i, j, "initialValue"].toString()) * 4) *
     2;
@@ -180,8 +289,7 @@ function drawCell(i: number, j: number): Cell {
       permanent: true,
       direction: "center",
       className: "token-label",
-    })
-      .setContent(tokenValue.toString()).setLatLng(center),
+    }).setContent(tokenValue.toString()).setLatLng(center),
   );
 
   const cell: Cell = { i, j, tokenValue, rect };
@@ -194,8 +302,8 @@ function drawCell(i: number, j: number): Cell {
 // Interaction
 // -----------------------
 function isNearbyCell(i: number, j: number) {
-  return Math.abs(i) <= INTERACTION_RADIUS_CELLS &&
-    Math.abs(j) <= INTERACTION_RADIUS_CELLS;
+  return Math.abs(i - playerI) <= INTERACTION_RADIUS_CELLS &&
+    Math.abs(j - playerJ) <= INTERACTION_RADIUS_CELLS;
 }
 
 function drawCellWithInteraction(i: number, j: number) {
@@ -203,17 +311,20 @@ function drawCellWithInteraction(i: number, j: number) {
   cell.rect.on("click", () => {
     if (!isNearbyCell(i, j)) return;
 
-    // --- Case 1: Player is holding something ---
+    // --- If player is holding a token ---
     if (heldToken) {
+      // If same value and nonzero -> merge
       if (cell.tokenValue === heldToken.value && cell.tokenValue !== 0) {
-        // Merge equal tokens
         cell.tokenValue *= 2;
         heldToken = null;
-      } else {
-        // Place or swap the token, even if cell is 0
-        const temp = cell.tokenValue;
+      } // If empty -> drop token there
+      else if (cell.tokenValue === 0) {
         cell.tokenValue = heldToken.value;
-        heldToken = temp > 0 ? { value: temp } : null;
+        heldToken = null;
+      } // If different -> show error popup
+      else {
+        showPopupMessage("That token doesn’t match the value on this spot!");
+        return; // don’t change anything
       }
 
       // Update visuals
@@ -232,7 +343,7 @@ function drawCellWithInteraction(i: number, j: number) {
       return;
     }
 
-    // --- Case 2: Pickup ---
+    // --- If player is NOT holding a token ---
     if (!heldToken && cell.tokenValue > 0) {
       heldToken = { value: cell.tokenValue };
       cell.tokenValue = 0;
@@ -282,19 +393,13 @@ function drawVisibleGrid() {
   for (let i = minI; i <= maxI; i++) {
     for (let j = minJ; j <= maxJ; j++) {
       const key = `${i},${j}`;
-      if (!drawnCells.has(key)) {
-        drawCellWithInteraction(i, j);
-      }
+      if (!drawnCells.has(key)) drawCellWithInteraction(i, j);
     }
   }
 }
 
 map.on("moveend", drawVisibleGrid);
 drawVisibleGrid();
-
-// -----------------------
-// Load Previous State
-// -----------------------
 loadGameState();
 
 // -----------------------
