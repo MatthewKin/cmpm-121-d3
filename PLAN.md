@@ -107,3 +107,47 @@ Polish / Performance (optional)
 [x] Add color tint to cells inside interaction range
 [x] Final styling of token markers (CSS)
 [x] Final D3.b commit & cleanup
+
+### D3.c
+
+Cells should appear to have a memory of their state that persists even when they are not visible on the map (but persistence across page loads is not yet required —see next assignment).
+
+### Steps D3.c
+
+Infrastructure
+
+[] Define CellCoord type (e.g., {i: number; j: number} or "i,j").
+
+[] Implement coordKey(i, j) → string helper.
+
+[] Create a global Map<string, CellMemento> to store modified cell states.
+
+Flyweight Pattern
+
+[] When drawing the grid, create only the visual rectangles.
+
+[] Do not store unmodified cells in the Map.
+
+[] Only store modified cells (changed token, color, etc.).
+
+Memento Pattern
+
+[] Define CellMemento holding minimal needed info (tokenValue, maybe fillOpacity, color).
+
+[] When a player modifies a cell, store a memento in the Map.
+
+[] Apply the visual change immediately on screen.
+
+Redrawing Cells on Map Move
+
+[] On map movement, clear existing rectangles.
+
+[] Recompute visible bounds.
+
+[] Redraw all visible cells fresh.
+
+[] For each cell, check if coordKey exists in Map:
+
+If yes → restore that state
+
+If no → draw default deterministic state
