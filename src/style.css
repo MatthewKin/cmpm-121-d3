@@ -29,3 +29,12 @@
   padding: 12px 20px;
   border-radius: 6px;
 }
+
+.leaflet-tooltip {
+  background-color: rgba(255, 255, 255, 0.6); /* make it more transparent */
+  color: #333; /* text color */
+  border: none; /* remove border if you want */
+  box-shadow: none; /* optional: remove tooltip shadow */
+  font-weight: normal;
+  font-size: 14px;
+}

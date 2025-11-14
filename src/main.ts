@@ -12,7 +12,7 @@ import "./style.css";
 const TILE_DEGREES = 0.0001;
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const INTERACTION_RADIUS_CELLS = 3;
-const PLAYER_LATLNG = leaflet.latLng(0, 0);
+const PLAYER_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
 
 // -----------------------
 // Map Setup
@@ -51,7 +51,7 @@ const interactionCircle = leaflet.circle(PLAYER_LATLNG, {
 }).addTo(map);
 
 // -----------------------
-// Grid & Cells
+// Grid & Cells (Map Storage)
 // -----------------------
 type Cell = {
   i: number;
@@ -59,13 +59,20 @@ type Cell = {
   tokenValue: number;
   rect: leaflet.Rectangle;
 };
-const cells: Cell[] = [];
-const drawnCells = new Set<string>();
+
+const cellMap = new Map<string, Cell>();
 let heldToken: { value: number } | null = null;
 
 let playerI = 0;
 let playerJ = 0;
 
+function coordKey(i: number, j: number) {
+  return `${i},${j}`;
+}
+
+// -----------------------
+// Player Movement
+// -----------------------
 function movePlayer(di: number, dj: number) {
   playerI += di;
   playerJ += dj;
@@ -74,13 +81,11 @@ function movePlayer(di: number, dj: number) {
   const newLng = PLAYER_LATLNG.lng + playerJ * TILE_DEGREES;
   const newPos = leaflet.latLng(newLat, newLng);
 
-  // Update existing marker and circle instead of adding new ones
   playerMarker.setLatLng(newPos);
   interactionCircle.setLatLng(newPos);
 
   map.panTo(newPos);
   drawVisibleGrid();
-
   highlightNearbyCells();
 }
 
@@ -133,29 +138,48 @@ const directions: Record<string, [number, number]> = {
   "→": [0, 1],
 };
 
-const buttons: Record<string, HTMLButtonElement> = {};
-for (const [symbol, [di, dj]] of Object.entries(directions)) {
-  const btn = document.createElement("button");
-  btn.innerText = symbol;
-  Object.assign(btn.style, {
-    fontSize: "24px",
-    borderRadius: "8px",
-    cursor: "pointer",
-  });
-  btn.onclick = () => movePlayer(di, dj);
-  buttons[symbol] = btn;
+// Clear existing children just in case
+moveDiv.innerHTML = "";
+
+// Define 3x3 layout manually
+const buttonGrid: (string | null)[][] = [
+  [null, "↑", null],
+  ["←", null, "→"],
+  [null, "↓", null],
+];
+
+for (let row = 0; row < 3; row++) {
+  for (let col = 0; col < 3; col++) {
+    const symbol = buttonGrid[row][col];
+    const cellDiv = document.createElement("div");
+
+    Object.assign(cellDiv.style, {
+      width: "50px",
+      height: "50px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    });
+
+    if (symbol) {
+      const [di, dj] = directions[symbol];
+      const btn = document.createElement("button");
+      btn.innerText = symbol;
+      Object.assign(btn.style, {
+        width: "100%",
+        height: "100%",
+        fontSize: "24px",
+        borderRadius: "8px",
+        cursor: "pointer",
+      });
+      btn.onclick = () => movePlayer(di, dj);
+      cellDiv.appendChild(btn);
+    }
+
+    moveDiv.appendChild(cellDiv);
+  }
 }
 
-// Layout
-moveDiv.appendChild(document.createElement("div"));
-moveDiv.appendChild(buttons["↑"]);
-moveDiv.appendChild(document.createElement("div"));
-moveDiv.appendChild(buttons["←"]);
-moveDiv.appendChild(document.createElement("div"));
-moveDiv.appendChild(buttons["→"]);
-moveDiv.appendChild(document.createElement("div"));
-moveDiv.appendChild(buttons["↓"]);
-moveDiv.appendChild(document.createElement("div"));
 document.body.appendChild(moveDiv);
 
 document.addEventListener("keydown", (e) => {
@@ -166,10 +190,10 @@ document.addEventListener("keydown", (e) => {
 });
 
 // -----------------------
-// Save/Load
+// Save / Load
 // -----------------------
 function saveGameState() {
-  const state = cells.map((c) => ({
+  const state = Array.from(cellMap.values()).map((c) => ({
     i: c.i,
     j: c.j,
     tokenValue: c.tokenValue,
@@ -186,7 +210,8 @@ function loadGameState() {
   if (savedHeldToken) heldToken = savedHeldToken;
 
   for (const sc of savedCells) {
-    const cell = cells.find((c) => c.i === sc.i && c.j === sc.j);
+    const key = coordKey(sc.i, sc.j);
+    const cell = cellMap.get(key);
     if (cell) {
       cell.tokenValue = sc.tokenValue;
       const center = cell.rect.getBounds().getCenter();
@@ -196,7 +221,9 @@ function loadGameState() {
           permanent: true,
           direction: "center",
           className: "token-label",
-        }).setContent(cell.tokenValue.toString()).setLatLng(center),
+        })
+          .setContent(cell.tokenValue.toString())
+          .setLatLng(center),
       );
     }
   }
@@ -232,9 +259,8 @@ function checkWinCondition() {
 }
 
 // -----------------------
-// Draw Cell
+// Draw Cell & Interaction
 // -----------------------
-
 function showPopupMessage(message: string) {
   const existing = document.getElementById("popupMessage");
   if (existing) existing.remove();
@@ -258,8 +284,6 @@ function showPopupMessage(message: string) {
   });
   popup.innerText = message;
   document.body.appendChild(popup);
-
-  // fade out after 2 seconds
   setTimeout(() => {
     popup.style.opacity = "0";
     setTimeout(() => popup.remove(), 300);
@@ -291,21 +315,22 @@ function drawCell(i: number, j: number): Cell {
       permanent: true,
       direction: "center",
       className: "token-label",
-    }).setContent(tokenValue.toString()).setLatLng(center),
+    })
+      .setContent(tokenValue.toString()).setLatLng(center),
   );
 
   const cell: Cell = { i, j, tokenValue, rect };
-  cells.push(cell);
-  drawnCells.add(`${i},${j}`);
+  cellMap.set(coordKey(i, j), cell);
   return cell;
 }
-
 // -----------------------
-// Interaction
+// Helper: check if a cell is near the player
 // -----------------------
-function isNearbyCell(i: number, j: number) {
-  return Math.abs(i - playerI) <= INTERACTION_RADIUS_CELLS &&
-    Math.abs(j - playerJ) <= INTERACTION_RADIUS_CELLS;
+function isNearbyCell(i: number, j: number): boolean {
+  return (
+    Math.abs(i - playerI) <= INTERACTION_RADIUS_CELLS &&
+    Math.abs(j - playerJ) <= INTERACTION_RADIUS_CELLS
+  );
 }
 
 function drawCellWithInteraction(i: number, j: number) {
@@ -313,23 +338,18 @@ function drawCellWithInteraction(i: number, j: number) {
   cell.rect.on("click", () => {
     if (!isNearbyCell(i, j)) return;
 
-    // --- If player is holding a token ---
     if (heldToken) {
-      // If same value and nonzero -> merge
       if (cell.tokenValue === heldToken.value && cell.tokenValue !== 0) {
         cell.tokenValue *= 2;
         heldToken = null;
-      } // If empty -> drop token there
-      else if (cell.tokenValue === 0) {
+      } else if (cell.tokenValue === 0) {
         cell.tokenValue = heldToken.value;
         heldToken = null;
-      } // If different -> show error popup
-      else {
+      } else {
         showPopupMessage("That token doesn’t match the value on this spot!");
-        return; // don’t change anything
+        return;
       }
 
-      // Update visuals
       const center = cell.rect.getBounds().getCenter();
       cell.rect.unbindTooltip();
       cell.rect.bindTooltip(
@@ -337,7 +357,9 @@ function drawCellWithInteraction(i: number, j: number) {
           permanent: true,
           direction: "center",
           className: "token-label",
-        }).setContent(cell.tokenValue.toString()).setLatLng(center),
+        })
+          .setContent(cell.tokenValue.toString())
+          .setLatLng(center),
       );
       cell.rect.setStyle({ fillOpacity: cell.tokenValue > 0 ? 0.4 : 0.1 });
       updateInventoryUI();
@@ -345,7 +367,6 @@ function drawCellWithInteraction(i: number, j: number) {
       return;
     }
 
-    // --- If player is NOT holding a token ---
     if (!heldToken && cell.tokenValue > 0) {
       heldToken = { value: cell.tokenValue };
       cell.tokenValue = 0;
@@ -357,7 +378,9 @@ function drawCellWithInteraction(i: number, j: number) {
           permanent: true,
           direction: "center",
           className: "token-label",
-        }).setContent(cell.tokenValue.toString()).setLatLng(center),
+        })
+          .setContent(cell.tokenValue.toString())
+          .setLatLng(center),
       );
       cell.rect.setStyle({ fillOpacity: 0.1 });
       updateInventoryUI();
@@ -394,18 +417,19 @@ function drawVisibleGrid() {
 
   for (let i = minI; i <= maxI; i++) {
     for (let j = minJ; j <= maxJ; j++) {
-      const key = `${i},${j}`;
-      if (!drawnCells.has(key)) drawCellWithInteraction(i, j);
+      const key = coordKey(i, j);
+      if (!cellMap.has(key)) drawCellWithInteraction(i, j);
     }
   }
 }
 
 // -----------------------
-// Highlight interactable cells
+// Highlight Nearby Cells
 // -----------------------
 function highlightNearbyCells() {
-  for (const cell of cells) {
-    if (isNearbyCell(cell.i, cell.j)) {
+  cellMap.forEach((cell, key) => {
+    const [i, j] = key.split(",").map(Number);
+    if (isNearbyCell(i, j)) {
       cell.rect.setStyle({
         color: "gold",
         weight: 2,
@@ -418,7 +442,7 @@ function highlightNearbyCells() {
         fillOpacity: cell.tokenValue > 0 ? 0.4 : 0.1,
       });
     }
-  }
+  });
 }
 
 map.on("moveend", drawVisibleGrid);

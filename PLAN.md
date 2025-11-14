@@ -116,37 +116,37 @@ Cells should appear to have a memory of their state that persists even when they
 
 Infrastructure
 
-[] Define CellCoord type (e.g., {i: number; j: number} or "i,j").
+[x] Define CellCoord type (e.g., {i: number; j: number} or "i,j").
 
-[] Implement coordKey(i, j) → string helper.
+[x] Implement coordKey(i, j) → string helper.
 
-[] Create a global Map<string, CellMemento> to store modified cell states.
+[x] Create a global Map<string, CellMemento> to store modified cell states.
 
 Flyweight Pattern
 
-[] When drawing the grid, create only the visual rectangles.
+[x] When drawing the grid, create only the visual rectangles.
 
-[] Do not store unmodified cells in the Map.
+[x] Do not store unmodified cells in the Map.
 
-[] Only store modified cells (changed token, color, etc.).
+[x] Only store modified cells (changed token, color, etc.).
 
 Memento Pattern
 
-[] Define CellMemento holding minimal needed info (tokenValue, maybe fillOpacity, color).
+[x] Define CellMemento holding minimal needed info (tokenValue, maybe fillOpacity, color).
 
-[] When a player modifies a cell, store a memento in the Map.
+[x] When a player modifies a cell, store a memento in the Map.
 
-[] Apply the visual change immediately on screen.
+[x] Apply the visual change immediately on screen.
 
 Redrawing Cells on Map Move
 
-[] On map movement, clear existing rectangles.
+[x] On map movement, clear existing rectangles.
 
-[] Recompute visible bounds.
+[x] Recompute visible bounds.
 
-[] Redraw all visible cells fresh.
+[x] Redraw all visible cells fresh.
 
-[] For each cell, check if coordKey exists in Map:
+[x] For each cell, check if coordKey exists in Map:
 
 If yes → restore that state
 
