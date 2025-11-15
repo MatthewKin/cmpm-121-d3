@@ -151,3 +151,38 @@ Redrawing Cells on Map Move
 If yes → restore that state
 
 If no → draw default deterministic state
+
+### D3.d
+
+Geolocation-based player movement (moving IRL moves the in-game player).
+A Facade interface for movement so the rest of the game doesn’t care how the player moved.
+localStorage for complete persistence across page reloads (already partly implemented).
+
+Runtime or query-string choice between:
+geolocation movement
+button/keyboard movement
+Option to start a new game
+
+### Steps D3.d
+
+Create the Movement Facade
+
+[] Define interface:
+
+[] Wrap existing button/keyboard movement
+
+[] Implement GeolocationMovementController
+
+Replace direct movement with controller calls
+
+[] Remove direct arrow-key → movePlayer() links
+
+[] Implement geolocation movement logic
+
+[] Track last-known physical position
+
+[] Convert real lat/lng → world grid cell (i,j)
+
+[] On change of cell, call existing movePlayer(di, dj)
+
+[] Add “Start New Game” system

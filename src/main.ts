@@ -323,6 +323,7 @@ function drawCell(i: number, j: number): Cell {
   cellMap.set(coordKey(i, j), cell);
   return cell;
 }
+
 // -----------------------
 // Helper: check if a cell is near the player
 // -----------------------
