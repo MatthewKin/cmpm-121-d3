@@ -179,10 +179,10 @@ Replace direct movement with controller calls
 
 [x] Implement geolocation movement logic
 
-[] Track last-known physical position
+[x] Track last-known physical position
 
-[] Convert real lat/lng → world grid cell (i,j)
+[x] Convert real lat/lng → world grid cell (i,j)
 
-[] On change of cell, call existing movePlayer(di, dj)
+[x] On change of cell, call existing movePlayer(di, dj)
 
 [x] Add “Start New Game” system

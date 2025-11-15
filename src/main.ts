@@ -14,137 +14,6 @@ const GAMEPLAY_ZOOM_LEVEL = 19;
 const INTERACTION_RADIUS_CELLS = 3;
 const PLAYER_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
 
-type MoveCallback = (di: number, dj: number) => void;
-
-interface MovementController {
-  start(): void;
-  stop(): void;
-}
-
-class _ButtonMovementController implements MovementController {
-  private onMove: MoveCallback;
-  private keyHandler = (e: KeyboardEvent) => {
-    if (e.key === "ArrowUp") this.onMove(1, 0);
-    if (e.key === "ArrowDown") this.onMove(-1, 0);
-    if (e.key === "ArrowLeft") this.onMove(0, -1);
-    if (e.key === "ArrowRight") this.onMove(0, 1);
-  };
-  private buttonHandlers: Array<{ el: HTMLElement; handler: EventListener }> =
-    [];
-
-  constructor(onMove: MoveCallback) {
-    this.onMove = onMove;
-  }
-
-  start() {
-    globalThis.addEventListener("keydown", this.keyHandler);
-    document.querySelectorAll<HTMLElement>("[data-move]").forEach((el) => {
-      const dir = el.dataset.move;
-      const handler = () => {
-        if (dir === "up") this.onMove(1, 0);
-        if (dir === "down") this.onMove(-1, 0);
-        if (dir === "left") this.onMove(0, -1);
-        if (dir === "right") this.onMove(0, 1);
-      };
-      el.addEventListener("click", handler);
-      this.buttonHandlers.push({ el, handler });
-    });
-  }
-
-  stop() {
-    globalThis.removeEventListener("keydown", this.keyHandler);
-    for (const { el, handler } of this.buttonHandlers) {
-      el.removeEventListener("click", handler);
-    }
-    this.buttonHandlers = [];
-  }
-}
-
-class _GeolocationMovementController implements MovementController {
-  private watchId: number | null = null;
-  private onMove: MoveCallback;
-  private lastLat: number | null = null;
-  private lastLng: number | null = null;
-  private metersPerCell = 5;
-
-  constructor(onMove: MoveCallback) {
-    this.onMove = onMove;
-  }
-
-  start() {
-    if (!navigator.geolocation) {
-      showPopupMessage("Geolocation not supported — using keyboard/buttons.");
-      return;
-    }
-    this.watchId = navigator.geolocation.watchPosition(
-      (pos) => this.handlePos(pos),
-      (_err) => {
-        showPopupMessage("Geolocation permission denied or unavailable.");
-      },
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 },
-    );
-  }
-
-  stop() {
-    if (this.watchId !== null) {
-      navigator.geolocation.clearWatch(this.watchId);
-      this.watchId = null;
-    }
-    this.lastLat = null;
-    this.lastLng = null;
-  }
-
-  private handlePos(pos: GeolocationPosition) {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-
-    if (this.lastLat === null || this.lastLng === null) {
-      this.lastLat = lat;
-      this.lastLng = lng;
-      return;
-    }
-
-    const meanLat = (lat + this.lastLat) / 2;
-    const metersPerDegLat = 111_000;
-    const metersPerDegLng = 111_000 * Math.cos(meanLat * Math.PI / 180);
-
-    const northMeters = (lat - this.lastLat) * metersPerDegLat;
-    const eastMeters = (lng - this.lastLng) * metersPerDegLng;
-
-    const di = Math.round(northMeters / this.metersPerCell);
-    const dj = Math.round(eastMeters / this.metersPerCell);
-
-    this.lastLat = lat;
-    this.lastLng = lng;
-
-    if (di !== 0 || dj !== 0) this.onMove(di, dj);
-  }
-}
-
-const uiContainer = document.createElement("div");
-Object.assign(uiContainer.style, {
-  position: "absolute",
-  top: "10px",
-  left: "10px",
-  display: "flex",
-  gap: "8px",
-  alignItems: "center",
-  zIndex: "1000",
-  fontFamily: "sans-serif",
-});
-document.body.appendChild(uiContainer);
-
-keyboardBtn.innerText = "Keyboard Movement";
-uiContainer.appendChild(keyboardBtn);
-
-const geoBtn = document.createElement("button");
-geoBtn.innerText = "Geolocation Movement";
-uiContainer.appendChild(geoBtn);
-
-const newGameBtn = document.createElement("button");
-newGameBtn.innerText = "Start New Game";
-uiContainer.appendChild(newGameBtn);
-
 // -----------------------
 // Map Setup
 // -----------------------
@@ -202,7 +71,161 @@ function coordKey(i: number, j: number) {
 }
 
 // -----------------------
-// Player Movement
+// Movement Facade & Controllers (D3.d additions)
+// -----------------------
+type MoveCallback = (di: number, dj: number) => void;
+
+interface MovementController {
+  start(): void;
+  stop(): void;
+}
+
+/**
+ * ButtonMovementController
+ * - Attaches to arrow keys and to buttons with data-move attributes.
+ * - Calls onMove(di, dj) when user requests movement.
+ */
+class ButtonMovementController implements MovementController {
+  private onMove: MoveCallback;
+  private keyHandler = (e: KeyboardEvent) => {
+    if (e.key === "ArrowUp") this.onMove(1, 0);
+    if (e.key === "ArrowDown") this.onMove(-1, 0);
+    if (e.key === "ArrowLeft") this.onMove(0, -1);
+    if (e.key === "ArrowRight") this.onMove(0, 1);
+  };
+  private buttonHandlers: Array<{ el: HTMLElement; handler: EventListener }> =
+    [];
+
+  constructor(onMove: MoveCallback) {
+    this.onMove = onMove;
+  }
+
+  start() {
+    // keyboard
+    globalThis.addEventListener("keydown", this.keyHandler);
+
+    // attach to any movement buttons with data-move attribute
+    document.querySelectorAll<HTMLElement>("[data-move]").forEach((el) => {
+      const dir = el.dataset.move; // expected "up", "down", "left", "right"
+      const handler = () => {
+        if (dir === "up") this.onMove(1, 0);
+        if (dir === "down") this.onMove(-1, 0);
+        if (dir === "left") this.onMove(0, -1);
+        if (dir === "right") this.onMove(0, 1);
+      };
+      el.addEventListener("click", handler);
+      this.buttonHandlers.push({ el, handler });
+    });
+  }
+
+  stop() {
+    globalThis.removeEventListener("keydown", this.keyHandler);
+    for (const { el, handler } of this.buttonHandlers) {
+      el.removeEventListener("click", handler);
+    }
+    this.buttonHandlers = [];
+  }
+}
+
+/**
+ * GeolocationMovementController
+ * - Watches device position, computes meters moved, maps every 5 meters to 1 grid cell,
+ *   and calls onMove with delta cells.
+ */
+class GeolocationMovementController implements MovementController {
+  private watchId: number | null = null;
+  private onMove: MoveCallback;
+  private lastLat: number | null = null;
+  private lastLng: number | null = null;
+
+  // meters that correspond to one game cell (user chose option A)
+  private metersPerCell = 5;
+
+  constructor(onMove: MoveCallback) {
+    this.onMove = onMove;
+  }
+
+  start() {
+    if (!navigator.geolocation) {
+      showPopupMessage("Geolocation not supported — using keyboard/buttons.");
+      return;
+    }
+    this.watchId = navigator.geolocation.watchPosition(
+      (pos) => this.handlePos(pos),
+      (err) => {
+        console.warn("Geolocation error:", err);
+        showPopupMessage("Geolocation permission denied or unavailable.");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      },
+    );
+  }
+
+  stop() {
+    if (this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+    this.lastLat = null;
+    this.lastLng = null;
+  }
+
+  private handlePos(pos: GeolocationPosition) {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    if (this.lastLat === null || this.lastLng === null) {
+      // initialize last known position, but also align player if needed:
+      this.lastLat = lat;
+      this.lastLng = lng;
+
+      // Convert geolocation to approximate cell indices and align with player if far
+      const i = Math.round((lat - PLAYER_LATLNG.lat) / TILE_DEGREES);
+      const j = Math.round((lng - PLAYER_LATLNG.lng) / TILE_DEGREES);
+      const diInit = i - playerI;
+      const djInit = j - playerJ;
+      if (diInit !== 0 || djInit !== 0) {
+        // move by cell-delta so in-game player follows real world when starting geo mode
+        this.onMove(diInit, djInit);
+        saveGameState();
+        highlightNearbyCells();
+      }
+      return;
+    }
+
+    // Compute north/south meters and east/west meters using simple equirectangular approx
+    const meanLat = (lat + this.lastLat) / 2;
+    const metersPerDegLat = 111_000; // approx
+    const metersPerDegLng = 111_000 * Math.cos(meanLat * Math.PI / 180);
+
+    const northMeters = (lat - this.lastLat) * metersPerDegLat;
+    const eastMeters = (lng - this.lastLng) * metersPerDegLng;
+
+    // convert meters into cell deltas using metersPerCell
+    const di = Math.round(northMeters / this.metersPerCell);
+    const dj = Math.round(eastMeters / this.metersPerCell);
+
+    // update last known
+    this.lastLat = lat;
+    this.lastLng = lng;
+
+    if (di !== 0 || dj !== 0) {
+      // forward delta to game (di,dj are in "cells" where 1 cell = metersPerCell)
+      // BUT game cells are TILE_DEGREES sized — we treat movePlayer(di, dj) as shifting grid by 'di' and 'dj'.
+      // This mapping is conceptually consistent: moving N cells will translate player by di units.
+      // Note: if metersPerCell isn't equal to meters represented by TILE_DEGREES, player's geolocation will change grid index at different rates.
+      this.onMove(di, dj);
+      saveGameState();
+      highlightNearbyCells();
+    }
+  }
+}
+
+// -----------------------
+// Player Movement (kept movePlayer signature as existing)
 // -----------------------
 function movePlayer(di: number, dj: number) {
   playerI += di;
@@ -247,7 +270,134 @@ function updateInventoryUI() {
 }
 
 // -----------------------
-// Movement UI
+// Movement UI (top-left simple buttons + new game)
+// -----------------------
+const uiContainer = document.createElement("div");
+uiContainer.id = "movementControls";
+Object.assign(uiContainer.style, {
+  position: "absolute",
+  top: "10px",
+  left: "10px",
+  display: "flex",
+  gap: "8px",
+  alignItems: "center",
+  zIndex: "1000",
+  fontFamily: "sans-serif",
+});
+document.body.appendChild(uiContainer);
+
+const keyboardBtn = document.createElement("button");
+keyboardBtn.id = "keyboardBtn";
+keyboardBtn.innerText = "Keyboard Movement";
+Object.assign(keyboardBtn.style, {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  cursor: "pointer",
+});
+uiContainer.appendChild(keyboardBtn);
+
+const geoBtn = document.createElement("button");
+geoBtn.id = "geoBtn";
+geoBtn.innerText = "Geolocation Movement";
+Object.assign(geoBtn.style, {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  cursor: "pointer",
+});
+uiContainer.appendChild(geoBtn);
+
+const newGameBtn = document.createElement("button");
+newGameBtn.id = "newGameBtn";
+newGameBtn.innerText = "Start New Game";
+Object.assign(newGameBtn.style, {
+  padding: "6px 10px",
+  borderRadius: "6px",
+  cursor: "pointer",
+});
+uiContainer.appendChild(newGameBtn);
+
+// Movement control helpers + persistence keys
+let movementController: MovementController | null = null;
+const MOVEMENT_MODE_KEY = "movementMode"; // "keyboard" | "geo"
+
+function updateMovementModeUI(mode: "keyboard" | "geo") {
+  if (mode === "keyboard") {
+    keyboardBtn.style.outline = "2px solid rgba(255,255,255,0.9)";
+    geoBtn.style.outline = "none";
+  } else {
+    geoBtn.style.outline = "2px solid rgba(255,255,255,0.9)";
+    keyboardBtn.style.outline = "none";
+  }
+}
+
+function refreshToggleText(mode: "keyboard" | "geo") {
+  // keep button label simple (or change styling above); we keep labels constant
+  updateMovementModeUI(mode);
+}
+
+// Start movement controller factory
+function startMovementController(mode: "keyboard" | "geo") {
+  if (movementController) movementController.stop();
+
+  if (mode === "keyboard") {
+    movementController = new ButtonMovementController((di, dj) => {
+      movePlayer(di, dj);
+      saveGameState();
+      highlightNearbyCells();
+    });
+    movementController.start();
+  } else {
+    movementController = new GeolocationMovementController((di, dj) => {
+      // geolocation controller returns di,dj cell-deltas relative to metersPerCell.
+      // we'll map these to movePlayer directly.
+      movePlayer(di, dj);
+      saveGameState();
+      highlightNearbyCells();
+    });
+    movementController.start();
+  }
+
+  localStorage.setItem(MOVEMENT_MODE_KEY, mode);
+  refreshToggleText(mode);
+}
+
+// Hook UI buttons
+keyboardBtn.onclick = () => startMovementController("keyboard");
+geoBtn.onclick = () => startMovementController("geo");
+newGameBtn.onclick = () => {
+  // Save current player grid coordinates
+  const currentI = playerI;
+  const currentJ = playerJ;
+
+  // Clear localStorage
+  localStorage.clear();
+
+  // Clear mementos / cellMap
+  cellMap.forEach((cell) => map.removeLayer(cell.rect));
+  cellMap.clear();
+  heldToken = null;
+  updateInventoryUI();
+
+  // Reset player position to where they currently are
+  playerI = currentI;
+  playerJ = currentJ;
+  const newLat = PLAYER_LATLNG.lat + playerI * TILE_DEGREES;
+  const newLng = PLAYER_LATLNG.lng + playerJ * TILE_DEGREES;
+  const newPos = leaflet.latLng(newLat, newLng);
+
+  playerMarker.setLatLng(newPos);
+  interactionCircle.setLatLng(newPos);
+  map.panTo(newPos);
+
+  // Redraw fresh grid
+  drawVisibleGrid();
+  highlightNearbyCells();
+
+  showPopupMessage("New Game Started at current location!");
+};
+
+// -----------------------
+// Movement button pad (bottom-center) - uses data-move attributes and no direct onclicks
 // -----------------------
 const moveDiv = document.createElement("div");
 Object.assign(moveDiv.style, {
@@ -262,22 +412,18 @@ Object.assign(moveDiv.style, {
   zIndex: "1000",
 });
 
-const directions: Record<string, [number, number]> = {
-  "↑": [1, 0],
-  "↓": [-1, 0],
-  "←": [0, -1],
-  "→": [0, 1],
-};
-
-// Clear existing children just in case
-moveDiv.innerHTML = "";
-
-// Define 3x3 layout manually
 const buttonGrid: (string | null)[][] = [
   [null, "↑", null],
   ["←", null, "→"],
   [null, "↓", null],
 ];
+
+const symbolToDir: Record<string, string> = {
+  "↑": "up",
+  "↓": "down",
+  "←": "left",
+  "→": "right",
+};
 
 for (let row = 0; row < 3; row++) {
   for (let col = 0; col < 3; col++) {
@@ -293,9 +439,9 @@ for (let row = 0; row < 3; row++) {
     });
 
     if (symbol) {
-      const [di, dj] = directions[symbol];
       const btn = document.createElement("button");
       btn.innerText = symbol;
+      btn.setAttribute("data-move", symbolToDir[symbol]);
       Object.assign(btn.style, {
         width: "100%",
         height: "100%",
@@ -303,7 +449,6 @@ for (let row = 0; row < 3; row++) {
         borderRadius: "8px",
         cursor: "pointer",
       });
-      btn.onclick = () => movePlayer(di, dj);
       cellDiv.appendChild(btn);
     }
 
@@ -313,15 +458,8 @@ for (let row = 0; row < 3; row++) {
 
 document.body.appendChild(moveDiv);
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") movePlayer(1, 0);
-  if (e.key === "ArrowDown") movePlayer(-1, 0);
-  if (e.key === "ArrowLeft") movePlayer(0, -1);
-  if (e.key === "ArrowRight") movePlayer(0, 1);
-});
-
 // -----------------------
-// Save / Load
+// Save / Load (extended to include player pos + movement mode)
 // -----------------------
 function saveGameState() {
   const state = Array.from(cellMap.values()).map((c) => ({
@@ -331,6 +469,9 @@ function saveGameState() {
   }));
   localStorage.setItem("cells", JSON.stringify(state));
   localStorage.setItem("heldToken", JSON.stringify(heldToken));
+  localStorage.setItem("playerPos", JSON.stringify({ playerI, playerJ }));
+  const mm = localStorage.getItem(MOVEMENT_MODE_KEY) || "keyboard";
+  localStorage.setItem(MOVEMENT_MODE_KEY, mm);
 }
 
 function loadGameState() {
@@ -338,7 +479,23 @@ function loadGameState() {
   const savedHeldToken = JSON.parse(
     localStorage.getItem("heldToken") || "null",
   );
+  const savedPlayer = JSON.parse(localStorage.getItem("playerPos") || "null");
+  const savedMovement =
+    (localStorage.getItem(MOVEMENT_MODE_KEY) as "keyboard" | "geo" | null) ||
+    null;
+
   if (savedHeldToken) heldToken = savedHeldToken;
+
+  if (savedPlayer) {
+    playerI = savedPlayer.playerI ?? playerI;
+    playerJ = savedPlayer.playerJ ?? playerJ;
+    const newLat = PLAYER_LATLNG.lat + playerI * TILE_DEGREES;
+    const newLng = PLAYER_LATLNG.lng + playerJ * TILE_DEGREES;
+    const newPos = leaflet.latLng(newLat, newLng);
+    playerMarker.setLatLng(newPos);
+    interactionCircle.setLatLng(newPos);
+    map.panTo(newPos);
+  }
 
   for (const sc of savedCells) {
     const key = coordKey(sc.i, sc.j);
@@ -356,10 +513,15 @@ function loadGameState() {
           .setContent(cell.tokenValue.toString())
           .setLatLng(center),
       );
+      cell.rect.setStyle({ fillOpacity: cell.tokenValue > 0 ? 0.4 : 0.1 });
+    } else {
+      // If the saved cell is not currently drawn, it will be recreated deterministically when visible.
+      // We intentionally avoid drawing out-of-view cells here.
     }
   }
 
   updateInventoryUI();
+  return savedMovement;
 }
 
 // -----------------------
@@ -577,9 +739,19 @@ function highlightNearbyCells() {
   });
 }
 
+// -----------------------
+// Initialization flow
+// -----------------------
 map.on("moveend", drawVisibleGrid);
 drawVisibleGrid();
-loadGameState();
+const savedMovement = loadGameState() as "keyboard" | "geo" | null;
+
+// Choose initial mode: prefer saved movement, else default to keyboard
+const initialMode: "keyboard" | "geo" = savedMovement === "geo"
+  ? "geo"
+  : "keyboard";
+startMovementController(initialMode);
+
 highlightNearbyCells();
 
 // -----------------------
