@@ -165,13 +165,13 @@ Option to start a new game
 
 ### Steps D3.d
 
-[] Create the Movement Facade
+[x] Create the Movement Facade
 
-[] Define interface:
+[x] Define interface:
 
-[] Wrap existing button/keyboard movement
+[x] Wrap existing button/keyboard movement
 
-[] Implement GeolocationMovementController
+[x] Implement GeolocationMovementController
 
 Replace direct movement with controller calls
 

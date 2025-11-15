@@ -60,6 +60,67 @@ class _ButtonMovementController implements MovementController {
   }
 }
 
+class _GeolocationMovementController implements MovementController {
+  private watchId: number | null = null;
+  private onMove: MoveCallback;
+  private lastLat: number | null = null;
+  private lastLng: number | null = null;
+  private metersPerCell = 5;
+
+  constructor(onMove: MoveCallback) {
+    this.onMove = onMove;
+  }
+
+  start() {
+    if (!navigator.geolocation) {
+      showPopupMessage("Geolocation not supported — using keyboard/buttons.");
+      return;
+    }
+    this.watchId = navigator.geolocation.watchPosition(
+      (pos) => this.handlePos(pos),
+      (_err) => {
+        showPopupMessage("Geolocation permission denied or unavailable.");
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 },
+    );
+  }
+
+  stop() {
+    if (this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+    this.lastLat = null;
+    this.lastLng = null;
+  }
+
+  private handlePos(pos: GeolocationPosition) {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    if (this.lastLat === null || this.lastLng === null) {
+      this.lastLat = lat;
+      this.lastLng = lng;
+      return;
+    }
+
+    const meanLat = (lat + this.lastLat) / 2;
+    const metersPerDegLat = 111_000;
+    const metersPerDegLng = 111_000 * Math.cos(meanLat * Math.PI / 180);
+
+    const northMeters = (lat - this.lastLat) * metersPerDegLat;
+    const eastMeters = (lng - this.lastLng) * metersPerDegLng;
+
+    const di = Math.round(northMeters / this.metersPerCell);
+    const dj = Math.round(eastMeters / this.metersPerCell);
+
+    this.lastLat = lat;
+    this.lastLng = lng;
+
+    if (di !== 0 || dj !== 0) this.onMove(di, dj);
+  }
+}
+
 // -----------------------
 // Map Setup
 // -----------------------
