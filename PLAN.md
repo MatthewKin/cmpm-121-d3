@@ -175,9 +175,9 @@ Option to start a new game
 
 Replace direct movement with controller calls
 
-[] Remove direct arrow-key → movePlayer() links
+[x] Remove direct arrow-key → movePlayer() links
 
-[] Implement geolocation movement logic
+[x] Implement geolocation movement logic
 
 [] Track last-known physical position
 
@@ -185,4 +185,4 @@ Replace direct movement with controller calls
 
 [] On change of cell, call existing movePlayer(di, dj)
 
-[] Add “Start New Game” system
+[x] Add “Start New Game” system

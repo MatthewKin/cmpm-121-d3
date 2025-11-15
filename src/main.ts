@@ -121,6 +121,30 @@ class _GeolocationMovementController implements MovementController {
   }
 }
 
+const uiContainer = document.createElement("div");
+Object.assign(uiContainer.style, {
+  position: "absolute",
+  top: "10px",
+  left: "10px",
+  display: "flex",
+  gap: "8px",
+  alignItems: "center",
+  zIndex: "1000",
+  fontFamily: "sans-serif",
+});
+document.body.appendChild(uiContainer);
+
+keyboardBtn.innerText = "Keyboard Movement";
+uiContainer.appendChild(keyboardBtn);
+
+const geoBtn = document.createElement("button");
+geoBtn.innerText = "Geolocation Movement";
+uiContainer.appendChild(geoBtn);
+
+const newGameBtn = document.createElement("button");
+newGameBtn.innerText = "Start New Game";
+uiContainer.appendChild(newGameBtn);
+
 // -----------------------
 // Map Setup
 // -----------------------
