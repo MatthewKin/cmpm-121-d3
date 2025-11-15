@@ -14,6 +14,52 @@ const GAMEPLAY_ZOOM_LEVEL = 19;
 const INTERACTION_RADIUS_CELLS = 3;
 const PLAYER_LATLNG = leaflet.latLng(36.997936938057016, -122.05703507501151);
 
+type MoveCallback = (di: number, dj: number) => void;
+
+interface MovementController {
+  start(): void;
+  stop(): void;
+}
+
+class _ButtonMovementController implements MovementController {
+  private onMove: MoveCallback;
+  private keyHandler = (e: KeyboardEvent) => {
+    if (e.key === "ArrowUp") this.onMove(1, 0);
+    if (e.key === "ArrowDown") this.onMove(-1, 0);
+    if (e.key === "ArrowLeft") this.onMove(0, -1);
+    if (e.key === "ArrowRight") this.onMove(0, 1);
+  };
+  private buttonHandlers: Array<{ el: HTMLElement; handler: EventListener }> =
+    [];
+
+  constructor(onMove: MoveCallback) {
+    this.onMove = onMove;
+  }
+
+  start() {
+    globalThis.addEventListener("keydown", this.keyHandler);
+    document.querySelectorAll<HTMLElement>("[data-move]").forEach((el) => {
+      const dir = el.dataset.move;
+      const handler = () => {
+        if (dir === "up") this.onMove(1, 0);
+        if (dir === "down") this.onMove(-1, 0);
+        if (dir === "left") this.onMove(0, -1);
+        if (dir === "right") this.onMove(0, 1);
+      };
+      el.addEventListener("click", handler);
+      this.buttonHandlers.push({ el, handler });
+    });
+  }
+
+  stop() {
+    globalThis.removeEventListener("keydown", this.keyHandler);
+    for (const { el, handler } of this.buttonHandlers) {
+      el.removeEventListener("click", handler);
+    }
+    this.buttonHandlers = [];
+  }
+}
+
 // -----------------------
 // Map Setup
 // -----------------------

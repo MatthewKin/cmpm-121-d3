@@ -165,7 +165,7 @@ Option to start a new game
 
 ### Steps D3.d
 
-Create the Movement Facade
+[] Create the Movement Facade
 
 [] Define interface:
 
